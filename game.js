@@ -1,14 +1,30 @@
 const PLAYER_SCALE = 0.05;
 const ENEMY_SCALE = 0.15;
 const BULLET_SCALE = 0.1;
+const LIFE_BONUS_SCALE = 0.07;  
+const DOUBLE_SHOT_BONUS_SCALE = 0.14; 
 
 const COLLISION_TOLERANCE_PLAYER = 30;
 const COLLISION_TOLERANCE_BULLET = 5;
 
+const MAX_LIVES = 3; 
+const ABSOLUTE_MAX_LIVES = 5; 
+const LIFE_BONUS_SPAWN_CHANCE = 55; 
+const DOUBLE_SHOT_BONUS_SPAWN_CHANCE = 45; 
+
+const INVULNERABILITY_DURATION = 120; 
+const BLINK_RATE = 8;
+
 let score = 0;
+let lives = MAX_LIVES; 
+let isDoubleShotActive = false; 
+
+let playerInvulnerable = false; 
+let invulnerabilityTimer = 0;
 
 let bullets = [];
 let enemies = [];
+let bonuses = []; 
 let enemySpawnTimer = 0;
 const SPAWN_INTERVAL = 60;
 
@@ -16,6 +32,7 @@ let app;
 let background; 
 let player;     
 let scoreText;  
+let livesText; 
 
 const getTexture = (key) => PIXI.Assets.get(key);
 
@@ -79,6 +96,47 @@ class Enemy extends PIXI.Sprite {
     }
 }
 
+class LifeBonus extends PIXI.Sprite {
+    constructor(x) {
+        super(getTexture('ship')); 
+        this.anchor.set(0.5);
+        this.scale.set(LIFE_BONUS_SCALE); 
+        this.x = x;
+        this.y = -50;
+        this.speed = 2;
+        this.isDead = false;
+        this.rotationSpeed = 0.02;
+    }
+    update() {
+        this.y += this.speed;
+        this.rotation += this.rotationSpeed; 
+        if (this.y > app.screen.height + 50) {
+            this.isDead = true;
+        }
+    }
+}
+
+class DoubleShotBonus extends PIXI.Sprite {
+    constructor(x) {
+        super(getTexture('gold_star')); 
+        this.anchor.set(0.5);
+        this.scale.set(DOUBLE_SHOT_BONUS_SCALE); 
+        this.x = x;
+        this.y = -50;
+        this.speed = 2;
+        this.isDead = false;
+        this.rotationSpeed = -0.03;
+    }
+    update() {
+        this.y += this.speed;
+        this.rotation += this.rotationSpeed; 
+        if (this.y > app.screen.height + 50) {
+            this.isDead = true;
+        }
+    }
+}
+
+
 function hitTestRectangle(r1, r2, tolerance) {
     const radius1 = r1.width / 2;
     const radius2 = r2.width / 2;
@@ -94,8 +152,13 @@ function hitTestRectangle(r1, r2, tolerance) {
 function restartGame() {
     app.stage.removeChildren();
     score = 0;
+    lives = MAX_LIVES; 
+    isDoubleShotActive = false; 
+    playerInvulnerable = false;
+    invulnerabilityTimer = 0;
     bullets = [];
     enemies = [];
+    bonuses = []; 
     enemySpawnTimer = 0;
     setupGameAssets(); 
     app.ticker.start();
@@ -121,13 +184,33 @@ async function setupGameAssets() {
     scoreText.x = 10;
     scoreText.y = 10;
     app.stage.addChild(scoreText);
+
+    livesText = new PIXI.Text(`Жизни: ${lives}`, {
+        fill: 0xFFD700,
+        fontSize: 20,
+        fontFamily: 'Arial',
+    });
+    livesText.x = app.screen.width - 10;
+    livesText.y = 10;
+    livesText.anchor.set(1, 0); 
+    app.stage.addChild(livesText);
 }
 
 function shoot() {
     if (app.ticker.started) {
-        const bullet = new Bullet(player.x, player.y - player.height / 2);
-        app.stage.addChild(bullet);
-        bullets.push(bullet);
+        const BULLET_OFFSET = 10; 
+        
+        if (isDoubleShotActive) {
+            const bullet1 = new Bullet(player.x - BULLET_OFFSET, player.y - player.height / 2);
+            const bullet2 = new Bullet(player.x + BULLET_OFFSET, player.y - player.height / 2);
+            app.stage.addChild(bullet1);
+            app.stage.addChild(bullet2);
+            bullets.push(bullet1, bullet2);
+        } else {
+            const bullet = new Bullet(player.x, player.y - player.height / 2);
+            app.stage.addChild(bullet);
+            bullets.push(bullet);
+        }
     }
 }
 
@@ -195,6 +278,10 @@ function resize() {
          player.x = newWidth / 2;
          player.y = newHeight - 50;
     }
+
+    if (livesText) {
+        livesText.x = newWidth - 10;
+    }
 }
 
 async function initGame() {
@@ -202,8 +289,9 @@ async function initGame() {
     PIXI.Assets.add('bullet', 'assets/bullet.svg');
     PIXI.Assets.add('enemy', 'assets/enemy.png');
     PIXI.Assets.add('stars', 'assets/stars.png'); 
+    PIXI.Assets.add('gold_star', 'assets/gold_star.svg'); 
 
-    await PIXI.Assets.load(['ship', 'bullet', 'enemy', 'stars']);
+    await PIXI.Assets.load(['ship', 'bullet', 'enemy', 'stars', 'gold_star']);
 
     if (!app) {
         app = new PIXI.Application({
@@ -233,6 +321,20 @@ async function initGame() {
         background.tilePosition.y += 0.5;
 
         player.update();
+        
+        if (playerInvulnerable) {
+            invulnerabilityTimer++;
+            
+            if (invulnerabilityTimer % BLINK_RATE === 0) {
+                player.visible = !player.visible;
+            }
+            
+            if (invulnerabilityTimer > INVULNERABILITY_DURATION) {
+                playerInvulnerable = false;
+                invulnerabilityTimer = 0;
+                player.visible = true;
+            }
+        }
 
         for (let i = bullets.length - 1; i >= 0; i--) {
             const bullet = bullets[i];
@@ -251,6 +353,24 @@ async function initGame() {
             app.stage.addChild(enemy);
             enemies.push(enemy);
             enemySpawnTimer = 0;
+            
+            if (Math.random() * LIFE_BONUS_SPAWN_CHANCE < 1) { 
+                 if (lives < ABSOLUTE_MAX_LIVES) {
+                    const bonusSpawnX = Math.random() * (app.screen.width - 80) + 40;
+                    const bonus = new LifeBonus(bonusSpawnX);
+                    app.stage.addChild(bonus);
+                    bonuses.push(bonus);
+                }
+            }
+            
+            if (Math.random() * DOUBLE_SHOT_BONUS_SPAWN_CHANCE < 1) { 
+                 if (!isDoubleShotActive) {
+                    const bonusSpawnX = Math.random() * (app.screen.width - 80) + 40;
+                    const bonus = new DoubleShotBonus(bonusSpawnX);
+                    app.stage.addChild(bonus);
+                    bonuses.push(bonus);
+                }
+            }
         }
 
         for (let i = enemies.length - 1; i >= 0; i--) {
@@ -259,6 +379,15 @@ async function initGame() {
             if (enemy.isDead) {
                 app.stage.removeChild(enemy);
                 enemies.splice(i, 1);
+            }
+        }
+        
+        for (let i = bonuses.length - 1; i >= 0; i--) {
+            const bonus = bonuses[i];
+            bonus.update();
+            if (bonus.isDead) {
+                app.stage.removeChild(bonus);
+                bonuses.splice(i, 1);
             }
         }
 
@@ -287,38 +416,71 @@ async function initGame() {
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
 
-            if (hitTestRectangle(player, enemy, COLLISION_TOLERANCE_PLAYER)) {
-                app.ticker.stop();
-
-                const gameOverText = new PIXI.Text('ИГРА ОКОНЧЕНА!', {
-                    fill: 0xFF0000,
-                    fontSize: 48,
-                    fontFamily: 'Arial',
-                    align: 'center',
-                });
-                gameOverText.x = app.screen.width / 2;
-                gameOverText.y = app.screen.height / 2 - 40;
-                gameOverText.anchor.set(0.5);
-                app.stage.addChild(gameOverText);
+            if (!playerInvulnerable && hitTestRectangle(player, enemy, COLLISION_TOLERANCE_PLAYER)) {
                 
-                const restartButton = new PIXI.Text('Начать заново (Space/Touch)', {
-                    fill: 0x00FF00,
-                    fontSize: 28,
-                    fontFamily: 'Arial',
-                    align: 'center',
-                });
-                restartButton.x = app.screen.width / 2;
-                restartButton.y = app.screen.height / 2 + 20;
-                restartButton.anchor.set(0.5);
-                
-                restartButton.eventMode = 'static';
-                restartButton.cursor = 'pointer'; 
-                
-                restartButton.on('pointerdown', restartGame); 
+                lives--;
+                livesText.text = `Жизни: ${lives}`;
 
-                app.stage.addChild(restartButton);
+                isDoubleShotActive = false; 
+                
+                playerInvulnerable = true;
+                invulnerabilityTimer = 0; 
 
-                return;
+                app.stage.removeChild(enemy);
+                enemies.splice(i, 1);
+                
+                if (lives <= 0) {
+                    app.ticker.stop();
+
+                    const gameOverText = new PIXI.Text('ИГРА ОКОНЧЕНА!', {
+                        fill: 0xFF0000,
+                        fontSize: 48,
+                        fontFamily: 'Arial',
+                        align: 'center',
+                    });
+                    gameOverText.x = app.screen.width / 2;
+                    gameOverText.y = app.screen.height / 2 - 40;
+                    gameOverText.anchor.set(0.5);
+                    app.stage.addChild(gameOverText);
+                    
+                    const restartButton = new PIXI.Text('Начать заново (Space/Touch)', {
+                        fill: 0x00FF00,
+                        fontSize: 28,
+                        fontFamily: 'Arial',
+                        align: 'center',
+                    });
+                    restartButton.x = app.screen.width / 2;
+                    restartButton.y = app.screen.height / 2 + 20;
+                    restartButton.anchor.set(0.5);
+                    
+                    restartButton.eventMode = 'static';
+                    restartButton.cursor = 'pointer'; 
+                    
+                    restartButton.on('pointerdown', restartGame); 
+
+                    app.stage.addChild(restartButton);
+
+                    return;
+                }
+            }
+        }
+        
+        for (let i = bonuses.length - 1; i >= 0; i--) {
+            const bonus = bonuses[i];
+
+            if (hitTestRectangle(player, bonus, COLLISION_TOLERANCE_PLAYER)) {
+                
+                if (bonus instanceof LifeBonus) {
+                     if (lives < ABSOLUTE_MAX_LIVES) {
+                        lives++;
+                        livesText.text = `Жизни: ${lives}`;
+                    }
+                } else if (bonus instanceof DoubleShotBonus) {
+                    isDoubleShotActive = true; 
+                }
+                
+                app.stage.removeChild(bonus);
+                bonuses.splice(i, 1);
             }
         }
     });
