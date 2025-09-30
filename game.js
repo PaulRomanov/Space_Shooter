@@ -1,6 +1,6 @@
 const PLAYER_SCALE = 0.05;
 const ENEMY_SCALE = 0.15;
-const GIANT_ENEMY_SCALE = 0.3; 
+const GIANT_ENEMY_SCALE = 0.3;
 const BULLET_SCALE = 0.1;
 const LIFE_BONUS_SCALE = 0.07;
 const DOUBLE_SHOT_BONUS_SCALE = 0.12;
@@ -8,33 +8,36 @@ const DOUBLE_SHOT_BONUS_SCALE = 0.12;
 const COLLISION_TOLERANCE_PLAYER = 30;
 const COLLISION_TOLERANCE_BULLET = 5;
 
-const MAX_LIVES = 3; 
-const ABSOLUTE_MAX_LIVES = 5; 
-const LIFE_BONUS_SPAWN_CHANCE = 55; 
-const DOUBLE_SHOT_BONUS_SPAWN_CHANCE = 45; 
-const GIANT_ENEMY_SPAWN_CHANCE = 15; 
+const MAX_LIVES = 3;
+const ABSOLUTE_MAX_LIVES = 5;
+const LIFE_BONUS_SPAWN_CHANCE = 55;
+const DOUBLE_SHOT_BONUS_SPAWN_CHANCE = 45;
+const GIANT_ENEMY_SPAWN_CHANCE = 10;
 
 const INVULNERABILITY_DURATION = 120;
 const BLINK_RATE = 8;
 
-let score = 0;
-let lives = MAX_LIVES; 
-let isDoubleShotActive = false; 
+const MISSED_ENEMY_PENALTY = 5;
+const MISSED_GIANT_PENALTY = 5;
 
-let playerInvulnerable = false; 
+let score = 0;
+let lives = MAX_LIVES;
+let isDoubleShotActive = false;
+
+let playerInvulnerable = false;
 let invulnerabilityTimer = 0;
 
 let bullets = [];
 let enemies = [];
-let bonuses = []; 
+let bonuses = [];
 let enemySpawnTimer = 0;
 const SPAWN_INTERVAL = 60;
 
 let app;
-let background; 
-let player;     
-let scoreText;  
-let livesText; 
+let background;
+let player;
+let scoreText;
+let livesText;
 
 const getTexture = (key) => PIXI.Assets.get(key);
 
@@ -105,7 +108,7 @@ class GiantEnemy extends PIXI.Sprite {
         this.scale.set(GIANT_ENEMY_SCALE);
         this.x = x;
         this.y = -50;
-        this.speed = Math.random() * 1 + 0.5; 
+        this.speed = Math.random() * 1 + 0.5;
         this.isDead = false;
     }
     update() {
@@ -118,7 +121,7 @@ class GiantEnemy extends PIXI.Sprite {
 
 class LifeBonus extends PIXI.Sprite {
     constructor(x) {
-        super(getTexture('ship')); 
+        super(getTexture('ship'));
         this.anchor.set(0.5);
         this.scale.set(LIFE_BONUS_SCALE);
         this.x = x;
@@ -129,7 +132,7 @@ class LifeBonus extends PIXI.Sprite {
     }
     update() {
         this.y += this.speed;
-        this.rotation += this.rotationSpeed; 
+        this.rotation += this.rotationSpeed;
         if (this.y > app.screen.height + 50) {
             this.isDead = true;
         }
@@ -138,7 +141,7 @@ class LifeBonus extends PIXI.Sprite {
 
 class DoubleShotBonus extends PIXI.Sprite {
     constructor(x) {
-        super(getTexture('gold_star')); 
+        super(getTexture('gold_star'));
         this.anchor.set(0.5);
         this.scale.set(DOUBLE_SHOT_BONUS_SCALE);
         this.x = x;
@@ -149,7 +152,7 @@ class DoubleShotBonus extends PIXI.Sprite {
     }
     update() {
         this.y += this.speed;
-        this.rotation += this.rotationSpeed; 
+        this.rotation += this.rotationSpeed;
         if (this.y > app.screen.height + 50) {
             this.isDead = true;
         }
@@ -164,7 +167,7 @@ function hitTestRectangle(r1, r2, tolerance) {
     const dx = r1.x - r2.x;
     const dy = r1.y - r2.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    const safeDistance = combinedRadius - tolerance; 
+    const safeDistance = combinedRadius - tolerance;
 
     return distance < safeDistance;
 }
@@ -172,15 +175,15 @@ function hitTestRectangle(r1, r2, tolerance) {
 function restartGame() {
     app.stage.removeChildren();
     score = 0;
-    lives = MAX_LIVES; 
-    isDoubleShotActive = false; 
-    playerInvulnerable = false; 
-    invulnerabilityTimer = 0; 
+    lives = MAX_LIVES;
+    isDoubleShotActive = false;
+    playerInvulnerable = false;
+    invulnerabilityTimer = 0;
     bullets = [];
     enemies = [];
-    bonuses = []; 
+    bonuses = [];
     enemySpawnTimer = 0;
-    setupGameAssets(); 
+    setupGameAssets();
     app.ticker.start();
 }
 
@@ -191,7 +194,7 @@ async function setupGameAssets() {
         app.screen.width,
         app.screen.height,
     );
-    app.stage.addChild(background); 
+    app.stage.addChild(background);
 
     player = new Player();
     app.stage.addChild(player);
@@ -212,14 +215,14 @@ async function setupGameAssets() {
     });
     livesText.x = app.screen.width - 10;
     livesText.y = 10;
-    livesText.anchor.set(1, 0); 
+    livesText.anchor.set(1, 0);
     app.stage.addChild(livesText);
 }
 
 function shoot() {
     if (app.ticker.started) {
-        const BULLET_OFFSET = 10; 
-        
+        const BULLET_OFFSET = 10;
+
         if (isDoubleShotActive) {
             const bullet1 = new Bullet(player.x - BULLET_OFFSET, player.y - player.height / 2);
             const bullet2 = new Bullet(player.x + BULLET_OFFSET, player.y - player.height / 2);
@@ -243,7 +246,7 @@ function handleKeyDown(event) {
         } else if (event.code === 'Space') {
             shoot();
         }
-    } 
+    }
     else if (event.code === 'Space') {
         restartGame();
     }
@@ -273,10 +276,10 @@ function handleTouchStart(event) {
         player.movingRight = true;
         player.movingLeft = false;
     }
-    
-    shoot(); 
 
-    event.preventDefault(); 
+    shoot();
+
+    event.preventDefault();
 }
 
 function handleTouchEnd() {
@@ -288,15 +291,15 @@ function resize() {
     const newWidth = window.innerWidth;
     const newHeight = window.innerHeight;
     app.renderer.resize(newWidth, newHeight);
-    
+
     if (background) {
         background.width = newWidth;
         background.height = newHeight;
     }
 
     if (player) {
-         player.x = newWidth / 2;
-         player.y = newHeight - 50;
+        player.x = newWidth / 2;
+        player.y = newHeight - 50;
     }
 
     if (livesText) {
@@ -308,8 +311,8 @@ async function initGame() {
     PIXI.Assets.add('ship', 'assets/ship.png');
     PIXI.Assets.add('bullet', 'assets/bullet.svg');
     PIXI.Assets.add('enemy', 'assets/enemy.png');
-    PIXI.Assets.add('stars', 'assets/stars.png'); 
-    PIXI.Assets.add('gold_star', 'assets/gold_star.svg'); 
+    PIXI.Assets.add('stars', 'assets/stars.png');
+    PIXI.Assets.add('gold_star', 'assets/gold_star.svg');
 
     await PIXI.Assets.load(['ship', 'bullet', 'enemy', 'stars', 'gold_star']);
 
@@ -318,41 +321,41 @@ async function initGame() {
             width: window.innerWidth,
             height: window.innerHeight,
             backgroundColor: 0x000000,
-            resolution: window.devicePixelRatio || 1, 
+            resolution: window.devicePixelRatio || 1,
             autoDensity: true,
         });
         document.body.appendChild(app.view);
     }
-    
+
     window.addEventListener('resize', resize);
-    resize(); 
+    resize();
 
     setupGameAssets();
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-    
+
     window.addEventListener('touchstart', handleTouchStart, { passive: false });
     window.addEventListener('touchend', handleTouchEnd);
 
 
     app.ticker.add(() => {
-        
+
         background.tilePosition.y += 0.5;
 
         player.update();
-        
+
         if (playerInvulnerable) {
             invulnerabilityTimer++;
-            
+
             if (invulnerabilityTimer % BLINK_RATE === 0) {
                 player.visible = !player.visible;
             }
-            
+
             if (invulnerabilityTimer > INVULNERABILITY_DURATION) {
                 playerInvulnerable = false;
                 invulnerabilityTimer = 0;
-                player.visible = true; 
+                player.visible = true;
             }
         }
 
@@ -369,32 +372,32 @@ async function initGame() {
         enemySpawnTimer += 1;
         if (enemySpawnTimer >= SPAWN_INTERVAL) {
             const spawnX = Math.random() * (app.screen.width - 80) + 40;
-            
+
             if (Math.random() * GIANT_ENEMY_SPAWN_CHANCE < 1) {
-                 const giantEnemy = new GiantEnemy(spawnX);
-                 app.stage.addChild(giantEnemy);
-                 enemies.push(giantEnemy);
-            } 
+                const giantEnemy = new GiantEnemy(spawnX);
+                app.stage.addChild(giantEnemy);
+                enemies.push(giantEnemy);
+            }
 
             else {
                 const enemy = new Enemy(spawnX);
                 app.stage.addChild(enemy);
                 enemies.push(enemy);
             }
-            
+
             enemySpawnTimer = 0;
-            
-            if (Math.random() * LIFE_BONUS_SPAWN_CHANCE < 1) { 
-                 if (lives < ABSOLUTE_MAX_LIVES) {
+
+            if (Math.random() * LIFE_BONUS_SPAWN_CHANCE < 1) {
+                if (lives < ABSOLUTE_MAX_LIVES) {
                     const bonusSpawnX = Math.random() * (app.screen.width - 80) + 40;
                     const bonus = new LifeBonus(bonusSpawnX);
                     app.stage.addChild(bonus);
                     bonuses.push(bonus);
                 }
             }
-            
-            if (Math.random() * DOUBLE_SHOT_BONUS_SPAWN_CHANCE < 1) { 
-                 if (!isDoubleShotActive) {
+
+            if (Math.random() * DOUBLE_SHOT_BONUS_SPAWN_CHANCE < 1) {
+                if (!isDoubleShotActive) {
                     const bonusSpawnX = Math.random() * (app.screen.width - 80) + 40;
                     const bonus = new DoubleShotBonus(bonusSpawnX);
                     app.stage.addChild(bonus);
@@ -406,12 +409,24 @@ async function initGame() {
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
             enemy.update();
+
             if (enemy.isDead) {
+
+                let penalty = 0;
+                if (enemy instanceof GiantEnemy) {
+                    penalty = MISSED_GIANT_PENALTY;
+                } else {
+                    penalty = MISSED_ENEMY_PENALTY;
+                }
+
+                score = Math.max(0, score - penalty);
+                scoreText.text = `Счет: ${score}`;
+
                 app.stage.removeChild(enemy);
                 enemies.splice(i, 1);
             }
         }
-        
+
         for (let i = bonuses.length - 1; i >= 0; i--) {
             const bonus = bonuses[i];
             bonus.update();
@@ -437,12 +452,12 @@ async function initGame() {
                             app.stage.addChild(newEnemy);
                             enemies.push(newEnemy);
                         }
-                        
-                        score += 5; 
+
+                        score += 5;
                     } else {
                         score += 10;
                     }
-                    
+
                     app.stage.removeChild(enemy);
                     enemies.splice(j, 1);
 
@@ -460,18 +475,18 @@ async function initGame() {
             const enemy = enemies[i];
 
             if (!playerInvulnerable && hitTestRectangle(player, enemy, COLLISION_TOLERANCE_PLAYER)) {
-                
+
                 lives--;
                 livesText.text = `Жизни: ${lives}`;
 
-                isDoubleShotActive = false; 
-                
+                isDoubleShotActive = false;
+
                 playerInvulnerable = true;
-                invulnerabilityTimer = 0; 
+                invulnerabilityTimer = 0;
 
                 app.stage.removeChild(enemy);
                 enemies.splice(i, 1);
-                
+
                 if (lives <= 0) {
                     app.ticker.stop();
 
@@ -485,7 +500,7 @@ async function initGame() {
                     gameOverText.y = app.screen.height / 2 - 40;
                     gameOverText.anchor.set(0.5);
                     app.stage.addChild(gameOverText);
-                    
+
                     const restartButton = new PIXI.Text('Начать заново (Space/Touch)', {
                         fill: 0x00FF00,
                         fontSize: 28,
@@ -495,11 +510,11 @@ async function initGame() {
                     restartButton.x = app.screen.width / 2;
                     restartButton.y = app.screen.height / 2 + 20;
                     restartButton.anchor.set(0.5);
-                    
+
                     restartButton.eventMode = 'static';
-                    restartButton.cursor = 'pointer'; 
-                    
-                    restartButton.on('pointerdown', restartGame); 
+                    restartButton.cursor = 'pointer';
+
+                    restartButton.on('pointerdown', restartGame);
 
                     app.stage.addChild(restartButton);
 
@@ -507,21 +522,21 @@ async function initGame() {
                 }
             }
         }
-        
+
         for (let i = bonuses.length - 1; i >= 0; i--) {
             const bonus = bonuses[i];
 
             if (hitTestRectangle(player, bonus, COLLISION_TOLERANCE_PLAYER)) {
-                
+
                 if (bonus instanceof LifeBonus) {
-                     if (lives < ABSOLUTE_MAX_LIVES) {
+                    if (lives < ABSOLUTE_MAX_LIVES) {
                         lives++;
                         livesText.text = `Жизни: ${lives}`;
                     }
                 } else if (bonus instanceof DoubleShotBonus) {
-                    isDoubleShotActive = true; 
+                    isDoubleShotActive = true;
                 }
-                
+
                 app.stage.removeChild(bonus);
                 bonuses.splice(i, 1);
             }
