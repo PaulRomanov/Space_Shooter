@@ -1,8 +1,9 @@
 const PLAYER_SCALE = 0.05;
 const ENEMY_SCALE = 0.15;
+const GIANT_ENEMY_SCALE = 0.3; 
 const BULLET_SCALE = 0.1;
-const LIFE_BONUS_SCALE = 0.07;  
-const DOUBLE_SHOT_BONUS_SCALE = 0.14; 
+const LIFE_BONUS_SCALE = 0.07;
+const DOUBLE_SHOT_BONUS_SCALE = 0.12;
 
 const COLLISION_TOLERANCE_PLAYER = 30;
 const COLLISION_TOLERANCE_BULLET = 5;
@@ -11,8 +12,9 @@ const MAX_LIVES = 3;
 const ABSOLUTE_MAX_LIVES = 5; 
 const LIFE_BONUS_SPAWN_CHANCE = 55; 
 const DOUBLE_SHOT_BONUS_SPAWN_CHANCE = 45; 
+const GIANT_ENEMY_SPAWN_CHANCE = 15; 
 
-const INVULNERABILITY_DURATION = 120; 
+const INVULNERABILITY_DURATION = 120;
 const BLINK_RATE = 8;
 
 let score = 0;
@@ -96,11 +98,29 @@ class Enemy extends PIXI.Sprite {
     }
 }
 
+class GiantEnemy extends PIXI.Sprite {
+    constructor(x) {
+        super(getTexture('enemy'));
+        this.anchor.set(0.5);
+        this.scale.set(GIANT_ENEMY_SCALE);
+        this.x = x;
+        this.y = -50;
+        this.speed = Math.random() * 1 + 0.5; 
+        this.isDead = false;
+    }
+    update() {
+        this.y += this.speed;
+        if (this.y > app.screen.height + 50) {
+            this.isDead = true;
+        }
+    }
+}
+
 class LifeBonus extends PIXI.Sprite {
     constructor(x) {
         super(getTexture('ship')); 
         this.anchor.set(0.5);
-        this.scale.set(LIFE_BONUS_SCALE); 
+        this.scale.set(LIFE_BONUS_SCALE);
         this.x = x;
         this.y = -50;
         this.speed = 2;
@@ -120,7 +140,7 @@ class DoubleShotBonus extends PIXI.Sprite {
     constructor(x) {
         super(getTexture('gold_star')); 
         this.anchor.set(0.5);
-        this.scale.set(DOUBLE_SHOT_BONUS_SCALE); 
+        this.scale.set(DOUBLE_SHOT_BONUS_SCALE);
         this.x = x;
         this.y = -50;
         this.speed = 2;
@@ -154,8 +174,8 @@ function restartGame() {
     score = 0;
     lives = MAX_LIVES; 
     isDoubleShotActive = false; 
-    playerInvulnerable = false;
-    invulnerabilityTimer = 0;
+    playerInvulnerable = false; 
+    invulnerabilityTimer = 0; 
     bullets = [];
     enemies = [];
     bonuses = []; 
@@ -332,7 +352,7 @@ async function initGame() {
             if (invulnerabilityTimer > INVULNERABILITY_DURATION) {
                 playerInvulnerable = false;
                 invulnerabilityTimer = 0;
-                player.visible = true;
+                player.visible = true; 
             }
         }
 
@@ -349,9 +369,19 @@ async function initGame() {
         enemySpawnTimer += 1;
         if (enemySpawnTimer >= SPAWN_INTERVAL) {
             const spawnX = Math.random() * (app.screen.width - 80) + 40;
-            const enemy = new Enemy(spawnX);
-            app.stage.addChild(enemy);
-            enemies.push(enemy);
+            
+            if (Math.random() * GIANT_ENEMY_SPAWN_CHANCE < 1) {
+                 const giantEnemy = new GiantEnemy(spawnX);
+                 app.stage.addChild(giantEnemy);
+                 enemies.push(giantEnemy);
+            } 
+
+            else {
+                const enemy = new Enemy(spawnX);
+                app.stage.addChild(enemy);
+                enemies.push(enemy);
+            }
+            
             enemySpawnTimer = 0;
             
             if (Math.random() * LIFE_BONUS_SPAWN_CHANCE < 1) { 
@@ -398,6 +428,20 @@ async function initGame() {
                 const enemy = enemies[j];
 
                 if (hitTestRectangle(bullet, enemy, COLLISION_TOLERANCE_BULLET)) {
+
+                    if (enemy instanceof GiantEnemy) {
+
+                        for (let k = 0; k < 2; k++) {
+                            const newEnemy = new Enemy(enemy.x + (k === 0 ? -20 : 20));
+                            newEnemy.y = enemy.y;
+                            app.stage.addChild(newEnemy);
+                            enemies.push(newEnemy);
+                        }
+                        
+                        score += 5; 
+                    } else {
+                        score += 10;
+                    }
                     
                     app.stage.removeChild(enemy);
                     enemies.splice(j, 1);
@@ -405,7 +449,6 @@ async function initGame() {
                     app.stage.removeChild(bullet);
                     bullets.splice(i, 1);
 
-                    score += 10;
                     scoreText.text = `Счет: ${score}`;
 
                     break;
